@@ -22,50 +22,41 @@ import com.lmax.disruptor.util.ThreadHints;
  * <p>
  * This strategy can be used when throughput and low-latency are not as important as CPU resource.
  */
-public final class BlockingWaitStrategy implements WaitStrategy
-{
-    private final Object mutex = new Object();
+public final class BlockingWaitStrategy implements WaitStrategy {
+	private final Object mutex = new Object();
 
-    @Override
-    public long waitFor(long sequence, Sequence cursorSequence, Sequence dependentSequence, SequenceBarrier barrier)
-        throws AlertException, InterruptedException
-    {
-        long availableSequence;
-        if (cursorSequence.get() < sequence)
-        {
-            synchronized (mutex)
-            {
-                while (cursorSequence.get() < sequence)
-                {
-                    barrier.checkAlert();
-                    mutex.wait();
-                }
-            }
-        }
+	@Override
+	public long waitFor (long sequence, Sequence cursorSequence, Sequence dependentSequence, SequenceBarrier barrier)
+			throws AlertException, InterruptedException {
+		long availableSequence;
+		if (cursorSequence.get() < sequence) {
+			synchronized (mutex) {
+				while (cursorSequence.get() < sequence) {
+					barrier.checkAlert();
+					mutex.wait();
+				}
+			}
+		}
 
-        while ((availableSequence = dependentSequence.get()) < sequence)
-        {
-            barrier.checkAlert();
-            ThreadHints.onSpinWait();
-        }
+		while ((availableSequence = dependentSequence.get()) < sequence) {
+			barrier.checkAlert();
+			ThreadHints.onSpinWait();
+		}
 
-        return availableSequence;
-    }
+		return availableSequence;
+	}
 
-    @Override
-    public void signalAllWhenBlocking()
-    {
-        synchronized (mutex)
-        {
-            mutex.notifyAll();
-        }
-    }
+	@Override
+	public void signalAllWhenBlocking () {
+		synchronized (mutex) {
+			mutex.notifyAll();
+		}
+	}
 
-    @Override
-    public String toString()
-    {
-        return "BlockingWaitStrategy{" +
-            "mutex=" + mutex +
-            '}';
-    }
+	@Override
+	public String toString () {
+		return "BlockingWaitStrategy{" +
+				"mutex=" + mutex +
+				'}';
+	}
 }
