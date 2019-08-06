@@ -19,28 +19,24 @@ import java.util.concurrent.locks.LockSupport;
 
 import com.lmax.disruptor.util.Util;
 
-abstract class SingleProducerSequencerPad extends AbstractSequencer
-{
-    protected long p1, p2, p3, p4, p5, p6, p7;
+abstract class SingleProducerSequencerPad extends AbstractSequencer {
+	protected long p1, p2, p3, p4, p5, p6, p7;
 
-    SingleProducerSequencerPad(int bufferSize, WaitStrategy waitStrategy)
-    {
-        super(bufferSize, waitStrategy);
-    }
+	SingleProducerSequencerPad (int bufferSize, WaitStrategy waitStrategy) {
+		super(bufferSize, waitStrategy);
+	}
 }
 
-abstract class SingleProducerSequencerFields extends SingleProducerSequencerPad
-{
-    SingleProducerSequencerFields(int bufferSize, WaitStrategy waitStrategy)
-    {
-        super(bufferSize, waitStrategy);
-    }
+abstract class SingleProducerSequencerFields extends SingleProducerSequencerPad {
+	SingleProducerSequencerFields (int bufferSize, WaitStrategy waitStrategy) {
+		super(bufferSize, waitStrategy);
+	}
 
-    /**
-     * Set to -1 as sequence starting point
-     */
-    long nextValue = Sequence.INITIAL_VALUE;
-    long cachedValue = Sequence.INITIAL_VALUE;
+	/**
+	 * Set to -1 as sequence starting point
+	 */
+	long nextValue = Sequence.INITIAL_VALUE;
+	long cachedValue = Sequence.INITIAL_VALUE;
 }
 
 /**
@@ -51,183 +47,161 @@ abstract class SingleProducerSequencerFields extends SingleProducerSequencerPad
  * to {@link Sequencer#publish(long)} is made.</p>
  */
 
-public final class SingleProducerSequencer extends SingleProducerSequencerFields
-{
-    protected long p1, p2, p3, p4, p5, p6, p7;
+public final class SingleProducerSequencer extends SingleProducerSequencerFields {
+	protected long p1, p2, p3, p4, p5, p6, p7;
 
-    /**
-     * Construct a Sequencer with the selected wait strategy and buffer size.
-     *
-     * @param bufferSize   the size of the buffer that this will sequence over.
-     * @param waitStrategy for those waiting on sequences.
-     */
-    public SingleProducerSequencer(int bufferSize, WaitStrategy waitStrategy)
-    {
-        super(bufferSize, waitStrategy);
-    }
+	/**
+	 * Construct a Sequencer with the selected wait strategy and buffer size.
+	 *
+	 * @param bufferSize   the size of the buffer that this will sequence over.
+	 * @param waitStrategy for those waiting on sequences.
+	 */
+	public SingleProducerSequencer (int bufferSize, WaitStrategy waitStrategy) {
+		super(bufferSize, waitStrategy);
+	}
 
-    /**
-     * @see Sequencer#hasAvailableCapacity(int)
-     */
-    @Override
-    public boolean hasAvailableCapacity(int requiredCapacity)
-    {
-        return hasAvailableCapacity(requiredCapacity, false);
-    }
+	/**
+	 * @see Sequencer#hasAvailableCapacity(int)
+	 */
+	@Override
+	public boolean hasAvailableCapacity (int requiredCapacity) {
+		return hasAvailableCapacity(requiredCapacity, false);
+	}
 
-    private boolean hasAvailableCapacity(int requiredCapacity, boolean doStore)
-    {
-        long nextValue = this.nextValue;
+	private boolean hasAvailableCapacity (int requiredCapacity, boolean doStore) {
+		long nextValue = this.nextValue;
 
-        long wrapPoint = (nextValue + requiredCapacity) - bufferSize;
-        long cachedGatingSequence = this.cachedValue;
+		long wrapPoint = (nextValue + requiredCapacity) - bufferSize;
+		long cachedGatingSequence = this.cachedValue;
 
-        if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue)
-        {
-            if (doStore)
-            {
-                cursor.setVolatile(nextValue);  // StoreLoad fence
-            }
+		if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue) {
+			if (doStore) {
+				cursor.setVolatile(nextValue);  // StoreLoad fence
+			}
 
-            long minSequence = Util.getMinimumSequence(gatingSequences, nextValue);
-            this.cachedValue = minSequence;
+			long minSequence = Util.getMinimumSequence(gatingSequences, nextValue);
+			this.cachedValue = minSequence;
 
-            if (wrapPoint > minSequence)
-            {
-                return false;
-            }
-        }
+			if (wrapPoint > minSequence) {
+				return false;
+			}
+		}
 
-        return true;
-    }
+		return true;
+	}
 
-    /**
-     * @see Sequencer#next()
-     */
-    @Override
-    public long next()
-    {
-        return next(1);
-    }
+	/**
+	 * @see Sequencer#next()
+	 */
+	@Override
+	public long next () {
+		return next(1);
+	}
 
-    /**
-     * @see Sequencer#next(int)
-     */
-    @Override
-    public long next(int n)
-    {
-        if (n < 1 || n > bufferSize)
-        {
-            throw new IllegalArgumentException("n must be > 0 and < bufferSize");
-        }
+	/**
+	 * @see Sequencer#next(int)
+	 */
+	@Override
+	public long next (int n) {
+		if (n < 1 || n > bufferSize) {
+			throw new IllegalArgumentException("n must be > 0 and < bufferSize");
+		}
 
-        long nextValue = this.nextValue;
+		long nextValue = this.nextValue;
 
-        long nextSequence = nextValue + n;
-        long wrapPoint = nextSequence - bufferSize;
-        long cachedGatingSequence = this.cachedValue;
+		long nextSequence = nextValue + n;
+		long wrapPoint = nextSequence - bufferSize;
+		long cachedGatingSequence = this.cachedValue;
 
-        if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue)
-        {
-            cursor.setVolatile(nextValue);  // StoreLoad fence
+		if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue) {
+			cursor.setVolatile(nextValue);  // StoreLoad fence
 
-            long minSequence;
-            while (wrapPoint > (minSequence = Util.getMinimumSequence(gatingSequences, nextValue)))
-            {
-                LockSupport.parkNanos(1L); // TODO: Use waitStrategy to spin?
-            }
+			long minSequence;
+			while (wrapPoint > (minSequence = Util.getMinimumSequence(gatingSequences, nextValue))) {
+				LockSupport.parkNanos(1L); // TODO: Use waitStrategy to spin?
+			}
 
-            this.cachedValue = minSequence;
-        }
+			this.cachedValue = minSequence;
+		}
 
-        this.nextValue = nextSequence;
+		this.nextValue = nextSequence;
 
-        return nextSequence;
-    }
+		return nextSequence;
+	}
 
-    /**
-     * @see Sequencer#tryNext()
-     */
-    @Override
-    public long tryNext() throws InsufficientCapacityException
-    {
-        return tryNext(1);
-    }
+	/**
+	 * @see Sequencer#tryNext()
+	 */
+	@Override
+	public long tryNext () throws InsufficientCapacityException {
+		return tryNext(1);
+	}
 
-    /**
-     * @see Sequencer#tryNext(int)
-     */
-    @Override
-    public long tryNext(int n) throws InsufficientCapacityException
-    {
-        if (n < 1)
-        {
-            throw new IllegalArgumentException("n must be > 0");
-        }
+	/**
+	 * @see Sequencer#tryNext(int)
+	 */
+	@Override
+	public long tryNext (int n) throws InsufficientCapacityException {
+		if (n < 1) {
+			throw new IllegalArgumentException("n must be > 0");
+		}
 
-        if (!hasAvailableCapacity(n, true))
-        {
-            throw InsufficientCapacityException.INSTANCE;
-        }
+		if (!hasAvailableCapacity(n, true)) {
+			throw InsufficientCapacityException.INSTANCE;
+		}
 
-        long nextSequence = this.nextValue += n;
+		long nextSequence = this.nextValue += n;
 
-        return nextSequence;
-    }
+		return nextSequence;
+	}
 
-    /**
-     * @see Sequencer#remainingCapacity()
-     */
-    @Override
-    public long remainingCapacity()
-    {
-        long nextValue = this.nextValue;
+	/**
+	 * @see Sequencer#remainingCapacity()
+	 */
+	@Override
+	public long remainingCapacity () {
+		long nextValue = this.nextValue;
 
-        long consumed = Util.getMinimumSequence(gatingSequences, nextValue);
-        long produced = nextValue;
-        return getBufferSize() - (produced - consumed);
-    }
+		long consumed = Util.getMinimumSequence(gatingSequences, nextValue);
+		long produced = nextValue;
+		return getBufferSize() - (produced - consumed);
+	}
 
-    /**
-     * @see Sequencer#claim(long)
-     */
-    @Override
-    public void claim(long sequence)
-    {
-        this.nextValue = sequence;
-    }
+	/**
+	 * @see Sequencer#claim(long)
+	 */
+	@Override
+	public void claim (long sequence) {
+		this.nextValue = sequence;
+	}
 
-    /**
-     * @see Sequencer#publish(long)
-     */
-    @Override
-    public void publish(long sequence)
-    {
-        cursor.set(sequence);
-        waitStrategy.signalAllWhenBlocking();
-    }
+	/**
+	 * @see Sequencer#publish(long)
+	 */
+	@Override
+	public void publish (long sequence) {
+		cursor.set(sequence);
+		waitStrategy.signalAllWhenBlocking();
+	}
 
-    /**
-     * @see Sequencer#publish(long, long)
-     */
-    @Override
-    public void publish(long lo, long hi)
-    {
-        publish(hi);
-    }
+	/**
+	 * @see Sequencer#publish(long, long)
+	 */
+	@Override
+	public void publish (long lo, long hi) {
+		publish(hi);
+	}
 
-    /**
-     * @see Sequencer#isAvailable(long)
-     */
-    @Override
-    public boolean isAvailable(long sequence)
-    {
-        return sequence <= cursor.get();
-    }
+	/**
+	 * @see Sequencer#isAvailable(long)
+	 */
+	@Override
+	public boolean isAvailable (long sequence) {
+		return sequence <= cursor.get();
+	}
 
-    @Override
-    public long getHighestPublishedSequence(long lowerBound, long availableSequence)
-    {
-        return availableSequence;
-    }
+	@Override
+	public long getHighestPublishedSequence (long lowerBound, long availableSequence) {
+		return availableSequence;
+	}
 }
