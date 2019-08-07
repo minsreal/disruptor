@@ -12,7 +12,7 @@ public class Main {
 
         EventMessageFactory factory = new EventMessageFactory();
 
-        int bufferSize = 1024;
+        int bufferSize = 64;
 
         Disruptor<EventMessage> disruptor = new Disruptor<>(factory, bufferSize, DaemonThreadFactory.INSTANCE);
 
