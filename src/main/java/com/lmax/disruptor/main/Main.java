@@ -24,12 +24,11 @@ public class Main {
 
         EventMessageProducer producer = new EventMessageProducer(ringBuffer);
 
-        ByteBuffer bb = ByteBuffer.allocate(8);
         try {
             for (long l = 0; true; l++) {
-                bb.putLong(0, l);
-                producer.onData(bb.toString());
-                Thread.sleep(1000);
+                producer.onData(String.valueOf(l));
+                System.out.println("product event: " + l);
+                Thread.sleep(500);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
